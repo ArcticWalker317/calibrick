@@ -9,26 +9,45 @@ reasoning that is not obvious from the code.
 
 | Piece | State |
 |---|---|
-| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. Kit v1 sent to the user; he is printing it on the **A1 mini**. `kits/v1/kit.json` records what was printed. |
-| Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | Generated from the real Bambu profile definitions. **Import into Bambu Studio not verified** (no slicer here); manual fallback table in `presets/README.md`. |
+| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. **Kit v1 started printing on the user's A1 mini at 21:50** (Bambu PLA Basic, textured PEI, 2 h 13 min, 28.9 g). `kits/v1/kit.json` records what was printed. Results expected around midnight. |
+| Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | **Import into Bambu Studio confirmed by the user** (A1 mini preset; his screenshot shows it selected with 0.16 / 0.16 layers and 31 layers = 4.96 mm). P1P preset untested. |
 | LDraw reader (`ldraw/`) | Working: BFC winding, hi-res primitives, provenance per triangle. |
-| Geometry engine (`engine/core.py`) | Working. Paris set 21064: 76 of 122 parts (759 of 931 pieces) verified closed solids (tier A); the rest exported as overlapping shells (tier B). No failures. |
-| Catalog (`catalog/`) | Working, 38 tests. Set → lots, colours, print / risky / buy, LDraw id resolution, buy list CSVs. |
-| Plates and 3MF (`output/`) | Working, tests pass. Plain multi-object 3MF; placement verified with PrusaSlicer, not with Bambu Studio. |
-| CLI, README, engine tests, end-to-end run, slicing check | Being written by a parallel worker at the time of writing. |
+| Geometry engine (`engine/core.py`, `engine/repair.py`) | Working. Paris set 21064: all 122 parts build; 107 (876 of 931 pieces) are verified closed solids (tier A), 15 are overlapping shells (tier B). |
+| Catalog (`catalog/`) | Working. Set → lots, colours, print / risky / buy, LDraw id resolution, buy list CSVs. |
+| Plates and 3MF (`output/`) | Working. Plain multi-object 3MF; placement verified with PrusaSlicer, not with Bambu Studio. |
+| CLI (`cli.py`), README, tests | Working: `calibrick setup / calibrate kit|solve|verify / profile / part / set find|info|build`. 88 tests pass. `setup` downloads are untested (no network in the sandbox). |
+| End-to-end Paris build | `calibrick set build 21064-1` → 239 lots, 931 pieces, 24 plates, ~837 g, 9 lots to buy, in about a minute. Nominal profile only, so not a fit you can trust yet. |
 
-Nothing has been test-printed except by the user tonight. Treat every fit number as
-unproven until his coupon results are in a profile and a verification print passes.
+Nothing has been test-printed except the coupon kit running tonight. Treat every fit number
+as unproven until the coupon results are in a profile and a verification print passes.
+
+Two workers were cut off by usage limits; their partial work is in the tree and tested:
+- `engine/repair.py` (`cap_loops`): closes leftover open loops so more bodies become solids
+  (76 → 107 tier A). It was mid-way through loops whose outline is not a simple polygon
+  (parts 3007, 32828, 3563, 30503, 96874). Parts it touched carry a warning asking for a look
+  at the slicer preview, because a cap could in principle fill a real opening.
+- `tools/slice_check.py` slices every part with a PrusaSlicer stand-in
+  (`/home/claude/work/output/psroot` in the sandbox, not in the repo) and compares filament
+  volume with mesh volume. Its last saved result predates the final engine; re-run it.
+
+Print time matters: the locked preset (40 mm/s outer walls, 6 wall loops) took 2 h 13 min for
+28.9 g. At that rate the Paris set is roughly 60 hours of printing. The user said time is not
+a constraint, but a faster preset is an obvious later experiment (it needs its own calibration).
 
 ## The calibration loop: what happens next
 
-1. User pastes the report from `docs/CALIBRATION.md` (ratings 1-5 per station, caliper readings).
-2. `calib.solve(kit, parse_results(text))` → `Profile` (save as `a1mini-<filament>.json`) plus a
-   report. `calib.next_ladders()` gives a finer kit (0.02 steps) around each answer.
-3. **Verification kit** (not built yet): real parts from the engine with the new profile:
-   3001 (brick 2x4), 3022 (plate 2x2), 3023b (plate 1x2), 3024 (plate 1x1), 6141 (round 1x1),
-   3070b (tile 1x1), 87079 (tile 2x4). Checks: genuine on printed, printed on genuine, printed
-   on printed, and several plates side by side on a genuine baseplate (exterior clearance).
+1. User pastes the report from `docs/CALIBRATION.md` (ratings 1-5 per station, caliper
+   readings). Save it as `kits/v1/results.txt` and commit it: it is the only record of the print.
+2. `calibrick calibrate solve kits/v1/results.txt --kit kits/v1/kit.json --name a1mini-pla-basic`
+   prints the fit per ladder and saves the profile (copy the JSON into `profiles/` in the repo
+   too, so it survives the sandbox). Read the report before trusting it:
+   - a ladder marked `all_loose` / `all_tight` has no answer yet; send a shifted kit
+     (`calibrick calibrate kit --next-from results.txt --kit kit.json`);
+   - "studs print X vs model" far from -0.03 or an `ext_clearance` at its 0 or 0.30 limit means
+     first-layer flare or a mis-read caliper; ask before building on it.
+3. **Verification kit:** `calibrick calibrate verify --profile a1mini-pla-basic --out verify_v1`
+   writes one pre-arranged STL of 25 real parts (2x4 bricks, plates, tiles, round 1x1s) plus the
+   preset. Send the STL; the five checks are in `docs/CALIBRATION.md`.
 4. Expect to tune, in this order: `tube_od` (the only inferred value, see CALIBRATION.md),
    `ext_clearance`, `post_d` (posts under 1xN parts are set to 3.0 mm so they do not grip;
    the coupon has no post), then `stud_h` / `roof_raise` if parts do not seat flush.

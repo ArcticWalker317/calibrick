@@ -50,12 +50,14 @@ from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
 
 from .. import csg
+from . import repair
 from ..ldraw import LDrawLibrary, RawMesh, expand_part
 from ..profile import LDU, Profile
 
-ENGINE_VERSION = 1
+ENGINE_VERSION = 4      # bump whenever generated geometry can change (invalidates the part cache)
 WELD_TOL = 1e-3          # mm
 MIN_ROOF = 0.9           # mm of roof that must remain above a raised cavity ceiling
+MAX_SHIFT = 0.6          # mm; no calibration offset legitimately moves a vertex further
 PLATE_CAVITY = 1.6       # LDraw depth of a plate-height cavity
 
 _PRIM_RE = re.compile(r"^\d+-\d+([a-z]+?)(\d*)$")
@@ -564,16 +566,29 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
                 f = np.vstack([f, np.array(caps, dtype=f.dtype)])
                 f_curved = np.concatenate([f_curved, np.zeros(len(caps), dtype=bool)])
                 count("capped_loops", len(centers))
+    # close remaining open loops (features drawn on uncut faces, missing caps, joints of
+    # removed features). Caps carry no displacement constraints and are no ray obstacles,
+    # so the dimensions of everything LDraw drew are exactly as without them.
+    f_cap = np.zeros(len(f), dtype=bool)
+    if len(f) and (_edge_use(f, len(verts)) == 1).any():
+        capf, n_cl, _ = repair.cap_loops(verts, f)
+        if len(capf):
+            f = np.vstack([f, capf])
+            f_curved = np.concatenate([f_curved, np.ones(len(capf), dtype=bool)])
+            f_cap = np.concatenate([f_cap, np.ones(len(capf), dtype=bool)])
+            count("repaired_loops", n_cl)
+            warns.append(f"{n_cl} open loop(s) in the LDraw mesh were closed automatically: check in the "
+                         "slicer preview that no real opening got filled")
     new_verts = verts.copy()
     if len(f):
         p0, p1, p2 = verts[f[:, 0]], verts[f[:, 1]], verts[f[:, 2]]
         nrm = np.cross(p1 - p0, p2 - p0)
         area = 0.5 * np.linalg.norm(nrm, axis=1)
         okf = area > 1e-9
-        f, f_curved, nrm, area = f[okf], f_curved[okf], nrm[okf], area[okf]
+        f, f_curved, f_cap, nrm, area = f[okf], f_curved[okf], f_cap[okf], nrm[okf], area[okf]
         nrm = nrm / (2 * area[:, None])
         cen = verts[f].mean(axis=1)
-        body_tris = verts[f]
+        body_tris = verts[f[~f_cap]]
 
         # ---- 4a. planar patches and their classification --------------------------------------
         planar = ~f_curved
@@ -655,6 +670,7 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
         for i, c in enumerate(circles):
             kind, dr = circle_rule(c, sem_names_of(c), prof)
             circ_dr[i] = dr
+        n_conflict = 0
         cons: dict[int, list] = {}
         sock_xy: set[tuple[float, float]] = set()
         active: set[int] = set()
@@ -692,8 +708,20 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
                 uniq[(tuple(np.round(n_, 3)), round(float(b_), 5))] = (n_, b_)
             a_mat = np.array([u[0] for u in uniq.values()])
             b_vec = np.array([u[1] for u in uniq.values()])
-            d_, *_ = np.linalg.lstsq(a_mat, b_vec, rcond=1e-6)
+            # damped least squares: nearly parallel constraints that disagree must not fling
+            # the vertex away (plain lstsq amplifies them by 1/sin(angle))
+            atb = a_mat.T @ b_vec
+            d_ = np.linalg.solve(a_mat.T @ a_mat + 1e-4 * np.eye(3), atb)
+            if np.linalg.norm(d_) > MAX_SHIFT:
+                d_ = np.linalg.solve(a_mat.T @ a_mat + 0.05 * np.eye(3), atb)
+                ln_ = float(np.linalg.norm(d_))
+                if ln_ > MAX_SHIFT:
+                    d_ = d_ * (MAX_SHIFT / ln_)
+                n_conflict += 1
             new_verts[v] = verts[v] + d_
+        if n_conflict:
+            warns.append(f"{n_conflict} vertices had conflicting offset constraints and were moved "
+                         "conservatively: look at that part in the slicer preview")
 
     # ---- 5. assemble ----------------------------------------------------------------------------
     good_parts: list[Manifold] = list(solids)
@@ -787,13 +815,16 @@ def _needs_support(tris: np.ndarray, max_bridge: float = 14.0) -> bool:
     cand = np.nonzero((nz < -0.6) & (cen[:, 2] > 0.3) & (area > 0.4) & (width > 1.0))[0]
     if not len(cand):
         return False
-    cand = cand[np.argsort(-area[cand])[:160]]
-    dirs = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]], dtype=float)
-    o = np.repeat(cen[cand] - np.array([0, 0, 0.08]), 4, axis=0)
-    d = ray_dist(o, np.tile(dirs, (len(cand), 1)), tris).reshape(-1, 4)
-    bridge_x = (d[:, 0] < max_bridge) & (d[:, 1] < max_bridge)
-    bridge_y = (d[:, 2] < max_bridge) & (d[:, 3] < max_bridge)
-    return bool((~(bridge_x | bridge_y)).any())
+    cand = cand[np.argsort(-area[cand])[:(24 if len(tris) > 40000 else 80)]]
+    # a face is bridgeable if, in ANY of 8 directions, something supports it on both sides
+    # (big plates have clear channels between tubes along X and Y but not diagonally)
+    ang = np.arange(8) * (np.pi / 8)
+    half = np.stack([np.cos(ang), np.sin(ang), np.zeros(8)], axis=1)
+    dirs = np.concatenate([half, -half])
+    o = np.repeat(cen[cand] - np.array([0, 0, 0.08]), 16, axis=0)
+    d = ray_dist(o, np.tile(dirs, (len(cand), 1)), tris).reshape(-1, 16)
+    bridged = ((d[:, :8] < max_bridge) & (d[:, 8:] < max_bridge)).any(axis=1)
+    return bool((~bridged).any())
 
 
 def build_part(part_id: str, profile: Profile, out_dir: str | Path, *,
