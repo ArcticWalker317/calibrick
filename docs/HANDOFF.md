@@ -12,7 +12,7 @@ reasoning that is not obvious from the code.
 | Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. **Kit v1 started printing on the user's A1 mini at 21:50** (Bambu PLA Basic, textured PEI, 2 h 13 min, 28.9 g). `kits/v1/kit.json` records what was printed. Results expected around midnight. |
 | Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | **Import into Bambu Studio confirmed by the user** (A1 mini preset; his screenshot shows it selected with 0.16 / 0.16 layers and 31 layers = 4.96 mm). P1P preset untested. |
 | LDraw reader (`ldraw/`) | Working: BFC winding, hi-res primitives, provenance per triangle. |
-| Geometry engine (`engine/core.py`, `engine/repair.py`) | Working. Paris set 21064: all 122 parts build; 107 (876 of 931 pieces) are verified closed solids (tier A), 15 are overlapping shells (tier B). |
+| Geometry engine (`engine/core.py`, `engine/repair.py`) | Working. Paris set 21064: all 121 distinct parts build; 100 (856 of 931 pieces) are verified closed solids (tier A), 21 are overlapping shells (tier B). |
 | Catalog (`catalog/`) | Working. Set → lots, colours, print / risky / buy, LDraw id resolution, buy list CSVs. |
 | Plates and 3MF (`output/`) | Working. Plain multi-object 3MF; placement verified with PrusaSlicer, not with Bambu Studio. |
 | CLI (`cli.py`), README, tests | Working: `calibrick setup / calibrate kit|solve|verify / profile / part / set find|info|build`. 88 tests pass. `setup` downloads are untested (no network in the sandbox). |
@@ -22,10 +22,14 @@ Nothing has been test-printed except the coupon kit running tonight. Treat every
 as unproven until the coupon results are in a profile and a verification print passes.
 
 Two workers were cut off by usage limits; their partial work is in the tree and tested:
-- `engine/repair.py` (`cap_loops`): closes leftover open loops so more bodies become solids
-  (76 → 107 tier A). It was mid-way through loops whose outline is not a simple polygon
-  (parts 3007, 32828, 3563, 30503, 96874). Parts it touched carry a warning asking for a look
-  at the slicer preview, because a cap could in principle fill a real opening.
+- `engine/repair.py`: loop detection and triangulation for closing leftover open loops.
+  Capping EVERY loop gave 107 tier A parts but can fill a real opening, so the engine
+  (`_cap_safe_loops` in core.py) only caps loops that are small (<= 4 mm) or flat with an
+  existing face behind them: 100 tier A. The worker was mid-way through loops whose outline is
+  not a simple polygon (parts 3007, 32828, 3563, 30503, 96874). The 21 tier B parts and their
+  open / over-shared edge counts are listed by `/home/claude/work/tierb/stats.py`-style sweeps
+  (expand_part + build_mesh over the set's ids); biggest by piece count: 3633 fence (17),
+  32828 (7), 15068, 30136, 30414, 4569 (6 each).
 - `tools/slice_check.py` slices every part with a PrusaSlicer stand-in
   (`/home/claude/work/output/psroot` in the sandbox, not in the repo) and compares filament
   volume with mesh volume. Its last saved result predates the final engine; re-run it.
@@ -113,6 +117,9 @@ Things the coupon may reveal that are fixed in the preset, not the profile:
    built; plates are plain 3MF plus an importable preset.
 9. `setup` downloads (LDraw complete.zip, Rebrickable CSVs) are written but could not be run
    in the sandbox.
+   Also: parts 5264, 5091, 5092 and 7307 of the Paris set have no geometry in the mirror used
+   here. They are recent moulds; check the official library and LDraw's unofficial parts
+   (`<ldraw>/unofficial/parts` is already searched by the reader) before buying them.
 10. Performance: the 16x16 plate takes ~18 s (per-vertex Python loop in the displacement solve
     and the zipper); fine for now, vectorise if it matters.
 
