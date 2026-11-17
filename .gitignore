@@ -7,3 +7,4 @@ dist/
 out/
 /work/
 .DS_Store
+kits/**/*.stl
