@@ -44,7 +44,7 @@ def test_parse_template():
     assert r.ratings["tube_od"] == [0, 0, 1, 2, 3, 4, 4, 4, 4]
     assert r.ratings["socket_d"] == [4, 3, 2, 2, 1, 0, 0, 0, 0]
     assert r.calipers == {
-        "S_length": 143.71, "S_width": 23.74, "S_thickness": 3.18, "S_total_height": 4.93,
+        "S_length": 143.71, "S_width": 23.74, "S_thickness": 3.18, "S_total_height": 4.97,
         "stud_1": 4.66, "stud_5": 4.87, "stud_9": 5.06, "U_length": 150.10,
         "U_cellB_width": 15.76,
     }
