@@ -54,7 +54,7 @@ from . import repair
 from ..ldraw import LDrawLibrary, RawMesh, expand_part
 from ..profile import LDU, Profile
 
-ENGINE_VERSION = 5     # bump whenever generated geometry can change (invalidates the part cache)
+ENGINE_VERSION = 6     # bump whenever generated geometry can change (invalidates the part cache)
 WELD_TOL = 1e-3          # mm
 MIN_ROOF = 0.9           # mm of roof that must remain above a raised cavity ceiling
 MAX_SHIFT = 0.6          # mm; no calibration offset legitimately moves a vertex further
@@ -259,6 +259,39 @@ def drop_flat_open(verts: np.ndarray, f: np.ndarray, f_curved: np.ndarray):
     drop = is_open & (dev < 1e-6)
     keep = ~drop[flab]
     return f[keep], f_curved[keep], int(drop.sum())
+
+
+def _cap_safe_loops(verts: np.ndarray, f: np.ndarray, small: float = 4.0):
+    """Cap open boundary loops, but only where a cap cannot fill a real opening.
+
+    A loop is capped if it is small (bounding-box diagonal <= `small` mm: seams, slivers,
+    joints of removed features) or if it is flat and an existing face of the body already
+    lies across it (a rib or cylinder end drawn standing on an uncut face). Large loops over
+    empty space are left open: they may be real openings, and the part then stays tier B.
+    Returns (cap faces, loops capped, loops left open).
+    """
+    tris = verts[f]
+    caps: list[tuple[int, int, int]] = []
+    n_cap = n_open = 0
+    for lp in repair.boundary_loops(f):
+        p = verts[lp]
+        c = p.mean(axis=0)
+        safe = float(np.linalg.norm(np.ptp(p, axis=0))) <= small
+        if not safe:
+            nv = repair._newell(p)
+            ln = float(np.linalg.norm(nv))
+            if ln > 1e-12:
+                nn = nv / ln
+                if float(np.abs((p - c) @ nn).max()) < 0.05:
+                    d = ray_dist(np.array([c - 0.02 * nn, c + 0.02 * nn]), np.array([nn, -nn]), tris)
+                    safe = bool((d < 0.06).any())
+        tri = repair.triangulate_loop(verts, lp) if safe else None
+        if tri is None:
+            n_open += 1
+            continue
+        caps += tri
+        n_cap += 1
+    return np.array(caps, dtype=f.dtype).reshape(-1, 3), n_cap, n_open
 
 
 def _frame(axis: np.ndarray, origin: np.ndarray) -> np.ndarray:
@@ -576,14 +609,13 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
     # so the dimensions of everything LDraw drew are exactly as without them.
     f_cap = np.zeros(len(f), dtype=bool)
     if len(f) and (_edge_use(f, len(verts)) == 1).any():
-        capf, n_cl, _ = repair.cap_loops(verts, f)
+        capf, n_cl, n_left_open = _cap_safe_loops(verts, f)
         if len(capf):
             f = np.vstack([f, capf])
             f_curved = np.concatenate([f_curved, np.ones(len(capf), dtype=bool)])
             f_cap = np.concatenate([f_cap, np.ones(len(capf), dtype=bool)])
             count("repaired_loops", n_cl)
-            warns.append(f"{n_cl} open loop(s) in the LDraw mesh were closed automatically: check in the "
-                         "slicer preview that no real opening got filled")
+            warns.append(f"{n_cl} small or face-backed open loop(s) in the LDraw mesh were closed automatically")
     new_verts = verts.copy()
     if len(f):
         p0, p1, p2 = verts[f[:, 0]], verts[f[:, 1]], verts[f[:, 2]]

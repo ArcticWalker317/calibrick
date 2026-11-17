@@ -404,7 +404,8 @@ def build_set(set_num: str, prof: Profile, printer, out: Path, *, include_risky=
     plan = catalog.load_set_plan(set_num)
     out.mkdir(parents=True, exist_ok=True)
     wanted = ("print", "risky") if include_risky else ("print",)
-    items = [it for it in plan.items if it.decision in wanted and it.ldraw_id]
+    items = [it for it in plan.items if it.decision in wanted and it.ldraw_id
+             and it.quantity + (it.spares if spares else 0) > 0]
     if only_color:
         oc = only_color.strip().lower()
         items = [it for it in items if it.color_name.lower() == oc]

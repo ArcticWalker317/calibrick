@@ -53,7 +53,8 @@ SLICE_ARGS = [
 # lines of slicer output worth keeping (lower case match)
 _MSG = re.compile(r"(warning|error|empty layer|repair|open edge|non-manifold|"
                   r"not manifold|consider|bed adhesion|bridging|overhang|floating|"
-                  r"collapsing|thin|too small|outside)", re.I)
+                  r"collapsing|thin|too small|outside|no extrusions|first layer|object name)", re.I)
+_STAMP = re.compile(r"^\[[^\]]*\]\s*\[[^\]]*\]\s*")       # "[time] [thread] " log prefix
 _PROGRESS = re.compile(r"^\d+ => ")
 STABILITY = ("low bed adhesion", "long bridging", "consider enabling", "loose extrusions",
              "collapsing overhang", "detected print stability", "print warning")
@@ -163,7 +164,7 @@ def check_part(pid: str, stl: Path, meta: dict, base_cmd, env, gdir: Path, timeo
     r["seconds"] = round(dt, 1)
     msgs = []
     for ln in text.splitlines():
-        s = ln.strip()
+        s = _STAMP.sub("", ln.strip()).strip()
         if s and not _PROGRESS.match(s) and _MSG.search(s) and s not in msgs:
             msgs.append(s)
     r["stability"] = [m for m in msgs if any(k in m.lower() for k in STABILITY)]
@@ -206,7 +207,7 @@ def hard_problems(r: dict) -> list[str]:
         if ex[0] < sx - 1.2 or ex[1] < sy - 1.2:
             p.append(f"extrusions span {ex[0]:.1f} x {ex[1]:.1f} mm, part is {sx:.1f} x {sy:.1f}")
     for m in r["messages"]:
-        if re.search(r"error|empty layer", m, re.I):
+        if re.search(r"error|empty layer|no extrusions", m, re.I):
             p.append(m)
     det = [c for c in r.get("solid_components", []) if c[3] == "detached"]
     if det:
