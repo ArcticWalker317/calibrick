@@ -9,7 +9,7 @@ reasoning that is not obvious from the code.
 
 | Piece | State |
 |---|---|
-| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. **Kit v1 started printing on the user's A1 mini at 21:50** (Bambu PLA Basic, textured PEI, 2 h 13 min, 28.9 g). `kits/v1/kit.json` records what was printed. Results expected around midnight. |
+| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. Kit v1 (Bambu PLA Basic, textured PEI, 2 h 13 min, 28.9 g) **failed 25 minutes in: small first-layer islands let go of the bed** (a 2x2 cell, rings). User was told to stop, wash the plate, and print **kit v1b** (same ladders, one-layer anchor tabs; `kits/v1b/kit.json`). Solve results against the kit.json of whichever kit he actually printed. |
 | Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | **Import into Bambu Studio confirmed by the user** (A1 mini preset; his screenshot shows it selected with 0.16 / 0.16 layers and 31 layers = 4.96 mm). P1P preset untested. |
 | LDraw reader (`ldraw/`) | Working: BFC winding, hi-res primitives, provenance per triangle. |
 | Geometry engine (`engine/core.py`, `engine/repair.py`) | Working. Paris set 21064: all 121 distinct parts build; 100 (856 of 931 pieces) are verified closed solids (tier A), 21 are overlapping shells (tier B). |
@@ -34,11 +34,26 @@ Two workers were cut off by usage limits; their partial work is in the tree and 
   (`/home/claude/work/output/psroot` in the sandbox, not in the repo) and compares filament
   volume with mesh volume. Its last saved result predates the final engine; re-run it.
 
+Slicing check after the last engine fixes (`tools/slice_check.py`, PrusaSlicer stand-in):
+all 100 tier A parts slice with extruded volume within 5-15 % of mesh volume, none
+suspicious. Of the 21 tier B parts, 16 slice to the right volume and 5 are confirmed bad:
+13731 (does not reach the bed in places, slicer refuses), 32828 (only 0.74 of the volume),
+91405 (16x16 plate, 0.90), 2654 (1.17), 75937 (slicer errors). Treat those five as "buy or
+fix" until repaired; the report does not mark them yet.
+
 Print time matters: the locked preset (40 mm/s outer walls, 6 wall loops) took 2 h 13 min for
 28.9 g. At that rate the Paris set is roughly 60 hours of printing. The user said time is not
 a constraint, but a faster preset is an obvious later experiment (it needs its own calibration).
 
 ## The calibration loop: what happens next
+
+**First-layer adhesion is an open risk for the whole project.** Real plates, tiles and bricks
+sit on the bed with the same 1.5 mm wall outlines and free-standing tubes that came loose on
+the v1 coupon. If v1b also loses islands on a clean plate, change the first layer in
+`slicer/bambu.py` before anything else (hotter bed, slower first layer, or a 0.2 mm first
+layer with the Z levels re-planned), then recalibrate. If real parts need help, the same
+anchor tabs can be added in the engine: corners of the exterior, and spokes on tubes pointing
+between stud positions (see `coupons.underside_coupon`), to be trimmed off after printing.
 
 1. User pastes the report from `docs/CALIBRATION.md` (ratings 1-5 per station, caliper
    readings). Save it as `kits/v1/results.txt` and commit it: it is the only record of the print.
