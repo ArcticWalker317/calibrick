@@ -24,7 +24,7 @@ PRINTERS: dict[str, PrinterSpec] = {
         bed=(180.0, 180.0),
         max_z=180.0,
         bambu_machine="Bambu Lab A1 mini 0.4 nozzle",
-        bambu_process_base="0.16mm Optimal @BBL A1M",
+        bambu_process_base="0.20mm Standard @BBL A1M",
     ),
     "p1p": PrinterSpec(
         key="p1p",
@@ -33,7 +33,7 @@ PRINTERS: dict[str, PrinterSpec] = {
         max_z=250.0,
         exclude=((0.0, 0.0, 18.0, 28.0),),
         bambu_machine="Bambu Lab P1P 0.4 nozzle",
-        bambu_process_base="0.16mm Optimal @BBL P1P",
+        bambu_process_base="0.20mm Standard @BBL P1P",
     ),
 }
 

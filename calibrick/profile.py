@@ -29,21 +29,21 @@ class Profile:
     name: str = "nominal"
     printer: str = "a1mini"
     nozzle: float = 0.4
-    layer_height: float = 0.16
+    layer_height: float = 0.20      # 0.2 (or 0.1): first layer is always the stock 0.2 mm
     filament: str = ""
     process_preset: str = ""
     calibrated: bool = False
 
     # ---- model-space feature sizes (mm) --------------------------------------------
     stud_d: float = 4.85          # stud outer diameter
-    stud_h: float = 1.76          # stud height; keep a multiple of layer_height
+    stud_h: float = 1.80          # stud height; keep a multiple of layer_height
     stud_chamfer: float = 0.12    # small lead-in on the stud's top edge
     socket_d: float = 4.95        # round hole gripping ONE stud (1x1 round underside, tube bore)
     cavity_gap: float = 4.90      # inner wall face to inner wall face for one stud row (LDraw 4.8)
     tube_od: float = 6.50         # underside tube outer diameter (LDraw 6.4, real 6.51)
     post_d: float = 3.00          # underside post between studs on 1xN parts (LDraw 3.2)
     ext_clearance: float = 0.10   # each exterior side wall is pulled in this far from the grid plane
-    roof_raise: float = 0.32      # extra depth for plate-height cavities (LDraw gives only 1.6)
+    roof_raise: float = 0.40      # extra depth for plate-height cavities (LDraw gives only 1.6)
     xy_scale: float = 1.0         # multiply XY by this to cancel shrinkage (1/measured_scale)
     z_scale: float = 1.0
 

@@ -48,6 +48,11 @@ def default_ladders(step: float = 0.05) -> dict[str, list[float]]:
 DIRECTION = {"stud_d": +1, "cavity_gap": -1, "tube_od": +1, "socket_d": -1}
 
 
+def _engrave(p: Profile) -> float:
+    """Label depth: a whole number of layers, about 0.45 mm."""
+    return round(0.45 / p.layer_height) * p.layer_height
+
+
 def stud_coupon(p: Profile, values: list[float]) -> Manifold:
     n = len(values)
     length = S_PITCH * n
@@ -59,7 +64,7 @@ def stud_coupon(p: Profile, values: list[float]) -> Manifold:
             for sy in (4.0, 12.0):
                 studs.append(csg.stud(x0 + sx, sy, PLATE_H, d, p.stud_h, p.stud_chamfer,
                                       p.layer_height))
-        labels.append(csg.pixel_text(str(i + 1), x0 + 8.0, 20.0, PLATE_H - 0.48, PLATE_H + 1.0,
+        labels.append(csg.pixel_text(str(i + 1), x0 + 8.0, 20.0, PLATE_H - _engrave(p), PLATE_H + 1.0,
                                      px=0.9, underline=True))
     return (base + csg.union(studs)) - csg.union(labels)
 
@@ -113,9 +118,9 @@ def underside_coupon(p: Profile, cavity: list[float], tube: list[float],
                 tabs.append(_spoke(cx, cyb, math.radians(90 * k), tube[i] / 2.0 - 0.15, 5.5, 1.3, lh))
         # station numbers: on the roof (seen from above) and on the bed side (seen flipped)
         yl = (yr0 + yr1) / 2.0
-        labels.append(csg.pixel_text(str(i + 1), cx, yl, top - 0.48, top + 1.0, px=1.0,
+        labels.append(csg.pixel_text(str(i + 1), cx, yl, top - _engrave(p), top + 1.0, px=1.0,
                                      underline=True))
-        labels.append(csg.pixel_text(str(i + 1), cx, yl, -1.0, 0.48, px=1.0,
+        labels.append(csg.pixel_text(str(i + 1), cx, yl, -1.0, _engrave(p), px=1.0,
                                      underline=True, mirror_x=True))
     body = csg.union(solids) - csg.union(cuts)
     body = body + csg.union(adds)

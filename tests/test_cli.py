@@ -105,7 +105,7 @@ def test_calibration_loop(tmp_path, capsys):
     assert kit["kit"] == "v1"
     assert kit["ladders"]["stud_d"][0] == pytest.approx(4.90 - 4 * 0.04)
     assert (kit_dir / "calibrick_kit_v1_both.stl").is_file()
-    assert list(kit_dir.glob("calibrick 0.16mm @BBL A1M.json"))
+    assert list(kit_dir.glob("calibrick 0.20mm @BBL A1M.json"))
 
     res = tmp_path / "results.txt"
     res.write_text(results_text())
@@ -150,7 +150,7 @@ def test_part_command(tmp_path, capsys):
     code, out = run(capsys, "part", "3022", "3024", "--out", str(tmp_path / "parts"))
     assert code == 0
     assert "NOT calibrated" in out
-    assert "3022: tier A  15.80 x 15.80 x 4.96 mm" in out
+    assert "3022: tier A  15.80 x 15.80 x 5.00 mm" in out
     assert (tmp_path / "parts" / "3024.stl").is_file()
 
 
@@ -162,7 +162,7 @@ def test_set_build_smoke(tmp_path, capsys):
     assert code == 0
     assert "NOT calibrated" in out
     for name in ("report.md", "manifest.json", "buy_list.csv", "profile.json", "plan.json",
-                 "calibrick 0.16mm @BBL A1M.json"):
+                 "calibrick 0.20mm @BBL A1M.json"):
         assert (out_dir / name).is_file(), name
     rep = (out_dir / "report.md").read_text()
     assert "Paris" in rep and "## Engine tiers" in rep and "not calibrated" in rep

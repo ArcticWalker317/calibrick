@@ -91,7 +91,7 @@ def base_preset_name(profile: Profile, printer: PrinterSpec) -> str:
     """Stock process preset the calibrick preset inherits from."""
     info = bambu_info(printer)
     lh = round(float(profile.layer_height), 2)
-    if abs(lh - 0.16) < 1e-9 and printer.bambu_process_base:
+    if abs(lh - 0.20) < 1e-9 and printer.bambu_process_base:
         return printer.bambu_process_base
     nearest = min(_BASE_LABEL_BY_LAYER, key=lambda k: abs(k - lh))
     return f"{_BASE_LABEL_BY_LAYER[nearest]} @BBL {info.suffix}"
@@ -119,7 +119,9 @@ def locked_settings(
     s: dict[str, str] = {
         # --- layers: every brick height is a whole number of layers ------------------
         "layer_height": lh,
-        "initial_layer_print_height": lh,
+        # stock first layer. A 0.16 mm first layer did not lay down on textured PEI (2026-11-16):
+        # it came out as a thin film that the nozzle tore up on layer 2.
+        "initial_layer_print_height": "0.2",
         "precise_z_height": "1",
         # --- size compensation lives in the geometry, not in the slicer --------------
         "xy_hole_compensation": "0",
@@ -143,8 +145,8 @@ def locked_settings(
         "small_perimeter_speed": "50%",        # of the outer wall speed -> 20 mm/s
         "small_perimeter_threshold": "4",      # loops with radius <= 4 mm: studs, tubes, sockets
         "top_surface_speed": "60",
-        "initial_layer_speed": "25",
-        "initial_layer_infill_speed": "40",
+        "initial_layer_speed": "30",
+        "initial_layer_infill_speed": "60",
         "gap_infill_speed": "80",
         "default_acceleration": "4000",
         "outer_wall_acceleration": "2000",

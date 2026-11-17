@@ -63,7 +63,7 @@ def build(tmp_path_factory, lib):
 def test_3022_size_and_solid(build):
     r, m = build("3022")
     assert r.tier == "A"
-    assert r.size == pytest.approx((15.8, 15.8, 4.96), abs=TOL)
+    assert r.size == pytest.approx((15.8, 15.8, 5.0), abs=TOL)
     assert m.status().name == "NoError"
     assert len(m.decompose()) == 1
     assert r.features.get("studs") == 4 and r.features.get("tubes") == 1
@@ -111,7 +111,7 @@ def test_3024_plate_1x1(build):
     p = Profile()
     r, m = build("3024")
     assert r.tier == "A"
-    assert r.size == pytest.approx((7.8, 7.8, 4.96), abs=TOL)
+    assert r.size == pytest.approx((7.8, 7.8, 5.0), abs=TOL)
     assert r.features.get("studs") == 1
     assert len(polys(m, 4.0)) == 1
     assert polys(m, 4.0)[0][0] == pytest.approx(p.stud_d, abs=TOL)

@@ -168,9 +168,10 @@ def write_process_preset(profile: Profile, printer: PrinterSpec, out_dir: Path) 
 
 ## Locked process preset (what the calibration is tied to)
 
-0.4 nozzle, **0.16 mm layers, first layer 0.16 mm** (3.2 mm plate = 20 layers, 9.6 mm brick = 60,
-stud 1.76 = 11), precise Z height on, X-Y hole and contour compensation **0** (geometry carries
+0.4 nozzle, **0.2 mm layers, stock 0.2 mm first layer** (3.2 mm plate = 16 layers, 9.6 mm brick = 48,
+stud 1.8 = 9, plate cavity 2.0 = 10; a 0.16 mm first layer did not lay down on textured PEI),
+precise Z height on, X-Y hole and contour compensation **0** (geometry carries
 the compensation), elephant-foot compensation left at the system default, outer wall printed
-first, slow outer wall (~40 mm/s) and modest acceleration, Arachne walls, enough wall loops
+first, slow outer wall (40 mm/s) and modest acceleration, Arachne walls, enough wall loops
 that studs and thin walls are all perimeters, no brim, no supports by default, seam aligned
 (scarf seam if the slicer supports it). Changing any of these invalidates a calibration.

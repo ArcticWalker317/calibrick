@@ -9,8 +9,8 @@ reasoning that is not obvious from the code.
 
 | Piece | State |
 |---|---|
-| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working. Kit v1 (Bambu PLA Basic, textured PEI, 2 h 13 min, 28.9 g) **failed 25 minutes in: small first-layer islands let go of the bed** (a 2x2 cell, rings). User was told to stop, wash the plate, and print **kit v1b** (same ladders, one-layer anchor tabs; `kits/v1b/kit.json`). Solve results against the kit.json of whichever kit he actually printed. |
-| Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | **Import into Bambu Studio confirmed by the user** (A1 mini preset; his screenshot shows it selected with 0.16 / 0.16 layers and 31 layers = 4.96 mm). P1P preset untested. |
+| Calibration coupons (`coupons.py`), solver (`calib.py`) | Working in software; **no coupon has printed successfully yet.** Kits v1 and v1b (0.16 mm layers, 0.16 mm first layer; Bambu PLA Basic on textured PEI) both failed in the first layers: small islands let go, then even the solid stud coupon's first layer tore. Cause judged to be the non-stock 0.16 mm first layer. **Kit v2** uses the 0.2 mm scheme and the stock first layer (`kits/v2/kit.json`, preset `calibrick 0.20mm @BBL A1M`). Solve results against the kit.json of the kit he actually printed. |
+| Locked Bambu process presets (`slicer/bambu.py`, `presets/`) | **Import into Bambu Studio confirmed by the user** (A1 mini; the 0.16 mm version imported and sliced correctly, the 0.20 mm version uses the same format). P1P preset untested. |
 | LDraw reader (`ldraw/`) | Working: BFC winding, hi-res primitives, provenance per triangle. |
 | Geometry engine (`engine/core.py`, `engine/repair.py`) | Working. Paris set 21064: all 121 distinct parts build; 100 (856 of 931 pieces) are verified closed solids (tier A), 21 are overlapping shells (tier B). |
 | Catalog (`catalog/`) | Working. Set → lots, colours, print / risky / buy, LDraw id resolution, buy list CSVs. |
@@ -91,12 +91,15 @@ Things the coupon may reveal that are fixed in the preset, not the profile:
   `csg.stud()` as the coupon (96 segments, one-layer lead-in on top), and coupon cells are
   real plate undersides with free-standing 1.5 mm walls, printed open side down. A ladder
   result is therefore directly the number the engine uses.
-- **0.16 mm layers, first layer 0.16.** 3.2 mm plates = 20 layers, 9.6 mm bricks = 60,
-  1.76 mm studs = 11, 1.92 mm cavity = 12. With a 0.2 first layer none of these land on a
-  layer boundary.
+- **0.2 mm layers with the stock 0.2 mm first layer.** 3.2 mm plates = 16 layers, 9.6 mm
+  bricks = 48, 1.8 mm studs = 9, 2.0 mm plate cavities = 10, so every Z level sits on a layer
+  boundary. The first attempt used 0.16 mm layers with a 0.16 mm first layer for the same
+  reason; on the user's textured PEI that first layer came out as a thin film and tore, twice.
+  Do not go below the stock first-layer height again. If finer layers are ever wanted, 0.1 mm
+  with a 0.2 mm first layer also keeps every level on a boundary.
 - **LDraw is not print geometry.** Known systematic differences that the engine corrects:
   exterior on the grid plane (real: 0.1 mm inside), plate cavity 1.6 deep (a genuine stud is
-  1.7-1.8 tall, so sockets are deepened to 1.92), stud 1.6 tall (we print 1.76), tube 6.4 OD
+  1.7-1.8 tall, so sockets are deepened to 2.0), stud 1.6 tall (we print 1.8), tube 6.4 OD
   (real 6.51), wall 1.6 (real 1.5, which falls out of the exterior move).
 - **Vertex displacement, not remeshing.** Moving welded vertices keeps LDraw's topology, so
   a mesh that was closed stays closed, and every flat face stays flat.

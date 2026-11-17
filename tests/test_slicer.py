@@ -21,8 +21,8 @@ def test_preset_json(tmp_path, key):
     assert doc["type"] == "process"
     assert doc["inherits"] == printer.bambu_process_base
     assert doc["print_settings_id"] == doc["name"] == path.stem
-    assert doc["layer_height"] == "0.16"
-    assert doc["initial_layer_print_height"] == "0.16"
+    assert doc["layer_height"] == "0.2"
+    assert doc["initial_layer_print_height"] == "0.2"
     for k in ("xy_hole_compensation", "xy_contour_compensation"):
         assert float(doc[k]) == 0.0
     # every value is a string or a list of strings

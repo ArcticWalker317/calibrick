@@ -6,9 +6,9 @@ Do it once per combination; re-check with one coupon when you change filament br
 ## 1. Print the kit
 
 1. In Bambu Studio select the printer, then **File > Import > Import Configs...** and pick
-   `presets/calibrick 0.16mm @BBL A1M.json` (see `presets/README.md` for the manual fallback).
-2. Process: `calibrick 0.16mm @BBL A1M`. Filament: your normal preset for the spool, untouched.
-3. Import `calibrick_kit_v1_both.stl`. Do not scale, rotate or flip it: it is already lying
+   `presets/calibrick 0.20mm @BBL A1M.json` (see `presets/README.md` for the manual fallback).
+2. Process: `calibrick 0.20mm @BBL A1M`. Filament: your normal preset for the spool, untouched.
+3. Import the kit's `..._both.stl` (or the S and U files separately). Do not scale, rotate or flip it: it is already lying
    the right way (the underside coupon prints open side down, like real parts).
 4. No supports, no brim. Leave flow dynamics calibration and bed levelling on.
 5. Let the print cool to room temperature before testing.
@@ -40,7 +40,7 @@ Use the **same genuine part** for a whole lane, ideally a newer one that still c
 ## 3. Measure with calipers (light pressure, a couple of readings each)
 
 - S length (nominal 143.80), S width (23.80), S thickness of the plate only (3.20),
-  S total height plate + stud (4.96)
+  S total height plate + stud (5.00)
 - one stud across its diameter at stations 1, 5 and 9 (model 4.70 / 4.90 / 5.10)
 - U length (150.20) and the outside width of one lane-B cell (15.80)
 
@@ -59,7 +59,7 @@ C: 5 4 3 3 2 1 1 1 1
 S length: 143.71
 S width: 23.74
 S thickness: 3.18
-S total height: 4.93
+S total height: 4.97
 stud 1: 4.66
 stud 5: 4.87
 stud 9: 5.06

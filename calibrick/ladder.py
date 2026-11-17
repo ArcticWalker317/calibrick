@@ -66,21 +66,22 @@ def build_part_ladder(part_id: str, field: str, values: list[float], profile: Pr
     tab_y0 = sy / 2.0 + 2.0                      # tabs sit behind the parts
     tab_y1 = tab_y0 + 8.4
     tris, solids = [], []
+    lh = profile.layer_height
     for i, b in enumerate(builds):
         row, col = divmod(i, per_row)
         cx, cy = col * pitch, -row * row_pitch
         tris.append(b.tris + np.array([cx, cy, 0.0]))
-        tab = csg.box(cx - 3.4, cy + tab_y0, 0.0, cx + 3.4, cy + tab_y1, 0.64)
-        tab = tab - csg.pixel_text(str(i + 1), cx, cy + (tab_y0 + tab_y1) / 2.0, 0.32, 1.0, px=0.9,
+        tab = csg.box(cx - 3.4, cy + tab_y0, 0.0, cx + 3.4, cy + tab_y1, 3 * lh)
+        tab = tab - csg.pixel_text(str(i + 1), cx, cy + (tab_y0 + tab_y1) / 2.0, lh, 1.0, px=0.9,
                                    underline=True)
         solids.append(tab)
         # breakaway strip from the tab into the back edge of the part (2 layers thick)
-        solids.append(csg.box(cx - 0.4, cy + sy / 2.0 - 0.35, 0.0, cx + 0.4, cy + tab_y0 + 0.2, 0.32))
+        solids.append(csg.box(cx - 0.4, cy + sy / 2.0 - 0.35, 0.0, cx + 0.4, cy + tab_y0 + 0.2, 2 * lh))
     for row in range(n_rows):                    # one rail per row keeps the tabs in order
         n_in_row = min(per_row, len(values) - row * per_row)
         cy = -row * row_pitch
         solids.append(csg.box(-3.4, cy + tab_y1 - 0.1, 0.0, (n_in_row - 1) * pitch + 3.4,
-                              cy + tab_y1 + 2.0, 0.64))
+                              cy + tab_y1 + 2.0, 3 * lh))
     tris.append(csg.to_tris(csg.union(solids)))
     allt = np.concatenate(tris)
     lo, hi = allt.reshape(-1, 3).min(axis=0), allt.reshape(-1, 3).max(axis=0)
