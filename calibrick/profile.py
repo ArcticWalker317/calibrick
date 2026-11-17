@@ -54,6 +54,7 @@ class Profile:
     axle_shrink: float = 0.05     # radial shrink applied to axle (cross) surfaces
     bar_d: float = 3.12           # 3.18 mm bars
     bar_hole_d: float = 3.30      # hollow-stud bore that accepts a bar
+    clip_d: float = 3.25          # inner diameter of C-clips that grip a 3.18 mm bar
     hole_grow: float = 0.06       # radial growth for unclassified round holes
     boss_shrink: float = 0.00     # radial shrink for unclassified round bosses
 

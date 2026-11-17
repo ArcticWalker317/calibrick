@@ -88,14 +88,15 @@ Things the coupon may reveal that are fixed in the preset, not the profile:
 ## Known limits, in rough priority order
 
 1. **Technic, bar and clip fits are uncalibrated** (`pin_hole_d`, `pin_d`, `axle_hole_grow`,
-   `axle_shrink`, `bar_d`, `bar_hole_d`). Build coupon T the same way as S/U: (a) a 1x9
-   Technic-beam-like strip, 7.8 mm thick, printed lying flat so the holes are vertical, hole
-   diameter 4.80 → 5.20 in 0.05 steps, test with a genuine pin (rate insertion and whether the
-   friction ridges hold); (b) a row of 3.18 mm bars standing upright, diameter 3.00 → 3.40,
-   test with a genuine clip; (c) a row of vertical holes 3.10 → 3.50 for a genuine bar;
-   (d) axle holes are a cross of 4.8 x 1.8 mm arms: ladder the arm width and length offset.
-   Parts with horizontal pin holes (Technic bricks) print the hole sideways; expect to need a
-   separate, larger value or a teardrop top for those.
+   `axle_shrink`, `bar_d`, `bar_hole_d`, `clip_d`). The mechanism to calibrate them exists:
+   **part ladders** (`calibrick/ladder.py`, `calibrick calibrate ladder|apply`, see
+   CALIBRATION.md) build one real part N times with a field stepped. None has been printed.
+   For the Paris set the order is `bar_d` on 60478, then `clip_d` on 15712, then `bar_hole_d`
+   on 85861. Still open: axle holes are a cross of flat faces, so `axle_hole_grow` only moves
+   their round parts; give the flat faces an offset too. Parts with horizontal pin holes
+   (Technic bricks) print the hole sideways and will want a separate, larger value or a
+   teardrop top. The 14 "risky" bar/clip lots in the Paris set (3633 fence, 60478, 15712,
+   32828, 44861, 4081b ...) stay risky until these ladders are done.
 2. **Side studs** (brackets, headlight bricks, SNOT bricks) are synthesised but print lying
    down, so they come out slightly flat and rough. Options: per-part orientation choice, or a
    separate `side_stud_d`.

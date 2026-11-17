@@ -246,6 +246,41 @@ def cmd_calibrate_solve(a) -> int:
     return 0
 
 
+def cmd_calibrate_ladder(a) -> int:
+    from . import ladder
+    from .slicer.bambu import write_process_preset
+
+    prof = _profile_from_arg(a.profile)
+    out = Path(a.out) if a.out else Path.cwd() / f"calibrick_ladder_{a.part}_{a.field}"
+    values = ladder.default_values(a.field, prof, a.center, a.step, a.n)
+    info = ladder.build_part_ladder(a.part, a.field, values, prof, out)
+    preset = write_process_preset(prof, get_printer(prof.printer), out)
+    print(f"ladder for {a.field} on part {a.part} ({info['description']}) written to {out}")
+    print(f"  print    {out / info['file']}   ({info['footprint'][0]} x {info['footprint'][1]} mm)")
+    print(f"  preset   {preset}")
+    print(f"  values   {' '.join(f'{v:.3f}' for v in values)}   (copy 1 -> {len(values)}, numbered tabs)")
+    if not info["responds"]:
+        print(f"WARNING: stepping {a.field} did not change this part's geometry; pick another part or field.")
+    print("Rate each copy 1-5 against a genuine mating part, then run\n"
+          f"  calibrick calibrate apply {out / ('ladder_' + a.part + '_' + a.field + '.json')} "
+          f"\"<ratings>\" --profile {prof.name}")
+    return 0
+
+
+def cmd_calibrate_apply(a) -> int:
+    from . import ladder
+
+    info = json.loads(Path(a.ladder_json).read_text())
+    prof = _profile_from_arg(a.profile)
+    new, fit = ladder.apply_ladder(info, a.ratings, prof)
+    if new is prof:
+        print(f"{info['field']}: no answer ({fit.status}). {fit.note}")
+        return 1
+    path = new.save(config.profiles_dir() / f"{new.name}.json")
+    print(f"{info['field']}: {getattr(prof, info['field']):.3f} -> {fit.value:.3f} ({fit.status}); saved {path}")
+    return 0
+
+
 def cmd_calibrate_verify(a) -> int:
     from .slicer.bambu import write_process_preset
     from .verify import build_verification_kit
@@ -588,6 +623,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", help="profile name (default <printer>-cal)")
     p.add_argument("--base", help="profile to start from (name or path)")
     p.set_defaults(func=cmd_calibrate_solve)
+    p = cal.add_parser("ladder", help="one real part built N times with one profile field stepped")
+    p.add_argument("--part", required=True, help="LDraw part id, e.g. 15712")
+    p.add_argument("--field", required=True, help="profile field to step, e.g. clip_d, bar_d, pin_hole_d")
+    p.add_argument("--center", type=float, help="middle value (default: the profile's current value)")
+    p.add_argument("--step", type=float, default=0.05)
+    p.add_argument("--n", type=int, default=9, help="number of copies")
+    p.add_argument("--profile", help="profile name or path")
+    p.add_argument("--out", help="output folder")
+    p.set_defaults(func=cmd_calibrate_ladder)
+    p = cal.add_parser("apply", help="set a profile field from the ratings of a part ladder")
+    p.add_argument("ladder_json")
+    p.add_argument("ratings", help='quoted ratings, station 1 first, e.g. "5 4 3 3 2 1 1 1 1"')
+    p.add_argument("--profile", required=True, help="profile name or path to update")
+    p.set_defaults(func=cmd_calibrate_apply)
     p = cal.add_parser("verify", help="real parts built with a profile, to confirm the fit")
     p.add_argument("--profile", help="profile name or path (default: nominal, uncalibrated)")
     p.add_argument("--out", help="output folder (default ./calibrick_verify_<profile>)")

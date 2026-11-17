@@ -109,8 +109,26 @@ Report which check failed and in which direction (loose / tight / gap); each map
 profile field: 1 → `stud_d`, 2 → `cavity_gap` (1-wide) or `tube_od` (2-wide) or `socket_d`
 (round), a gap under seated parts → `roof_raise`, 4 → `ext_clearance`, 5 → `xy_scale`.
 
-## Not calibrated yet
+## Bars, clips, Technic holes: part ladders
 
-Technic pin holes, axle holes, pins, bars and clips use starting values in the profile
-(`pin_hole_d`, `axle_hole_grow`, `bar_d`, ...). They need their own ladder coupon; see
-`docs/HANDOFF.md`.
+The coupon kit covers studs, walls, tubes and sockets. Every other fit is calibrated on a
+real part: the same part is built several times with one profile field stepped, each copy
+tied to a numbered tab by a thin strip you snap off afterwards.
+
+```
+calibrick calibrate ladder --part 60478 --field bar_d      --profile NAME   # handle; test with a genuine clip
+calibrick calibrate ladder --part 15712 --field clip_d     --profile NAME   # clip; test with a genuine bar
+calibrick calibrate ladder --part 85861 --field bar_hole_d --profile NAME   # open stud; test with a genuine bar
+calibrick calibrate ladder --part 3700  --field pin_hole_d --profile NAME   # Technic hole; test with a genuine pin
+calibrick calibrate apply ladder_15712_clip_d.json "5 5 4 3 3 2 1 1 1" --profile NAME
+```
+
+Same 1-5 ratings, copy 1 first. Do bars before clips: once `bar_d` is right, printed bars and
+handles can stand in for genuine ones. Any field in `calibrick/ladder.py: DIRECTION` can be
+laddered on any part that has the feature; the command warns if stepping the field does not
+change that part. Until a field has been laddered it holds a reasonable FDM starting value,
+and the set report marks parts that depend on it as "risky".
+
+Not covered yet: axle holes and axles (the cross is flat-sided, not a circle, so only its
+round parts move), and holes that print sideways (Technic bricks) versus upright (beams)
+share one `pin_hole_d`.

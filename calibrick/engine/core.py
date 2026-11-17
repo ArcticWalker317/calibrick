@@ -54,7 +54,7 @@ from . import repair
 from ..ldraw import LDrawLibrary, RawMesh, expand_part
 from ..profile import LDU, Profile
 
-ENGINE_VERSION = 4      # bump whenever generated geometry can change (invalidates the part cache)
+ENGINE_VERSION = 5     # bump whenever generated geometry can change (invalidates the part cache)
 WELD_TOL = 1e-3          # mm
 MIN_ROOF = 0.9           # mm of roof that must remain above a raised cavity ceiling
 MAX_SHIFT = 0.6          # mm; no calibration offset legitimately moves a vertex further
@@ -105,6 +105,7 @@ class _Circle:
     votes: int = 0                    # >0 outward-facing surface (boss), <0 inward (hole)
     flat: bool = False                # touched by a flat cap primitive (disc/ring/ndis)
     hires: bool = True
+    partial: bool = False             # made (at least partly) from arc primitives, not full circles
     sem_ids: set = field(default_factory=set)
     prim_ids: set = field(default_factory=set)
     group: int = -1                   # coaxial group id
@@ -337,6 +338,7 @@ def find_circles(raw: RawMesh):
                 else:
                     ci.flat = True
                 ci.hires = ci.hires and inst.hires
+                ci.partial = ci.partial or not inst.prim.startswith("4-4")
                 ci.sem_ids.add(inst.sem_id)
                 ci.prim_ids.add(inst.prim_id)
     return circles, corner_circle, tri_curved
@@ -363,7 +365,10 @@ def circle_rule(c: _Circle, sems: set[str], prof: Profile) -> tuple[str, float]:
         elif near(6):
             kind, target = "socket", prof.socket_d / 2
         elif near(4):
-            kind, target = "bar_hole", prof.bar_hole_d / 2
+            if has("clip") or c.partial:        # an arc, not a full bore: a C-clip
+                kind, target = "clip", prof.clip_d / 2
+            else:
+                kind, target = "bar_hole", prof.bar_hole_d / 2
         else:
             kind, target = "hole", r + prof.hole_grow
         if not c.hires:                         # 16-gon hole: make the flats, not the corners, fit
