@@ -90,6 +90,25 @@ found, or a shifted ladder where every station was too loose or too tight. After
 verification kit is real parts generated with the profile (2x4 brick, 2x2 and 1x2 plates,
 1x1 round plate) checked against genuine parts and against each other.
 
+### Verification kit checks
+
+`calibrick.verify.build_verification_kit(profile, out_dir)` writes one pre-arranged STL of
+real parts. Print it with the same preset, filament and plate, then check:
+
+1. **Genuine on printed:** a genuine 2x2 on the printed 2x4 brick and 2x2 plate studs.
+2. **Printed on genuine:** every printed part pressed onto a genuine plate. Tiles and plates
+   must seat flush with no gap underneath (a gap means sockets are too shallow or too tight).
+3. **Printed on printed:** stack the two 2x4 bricks; the pair should measure 19.2 mm without
+   studs, and pull apart like genuine bricks.
+4. **Side by side:** printed 1x1 plates and tiles packed next to each other on a genuine
+   plate must drop in without pushing each other (exterior clearance), with a hairline gap.
+5. **Pitch:** the 1x4 plate and 2x4 tile must seat on four studs in a row without rocking
+   (XY scale).
+
+Report which check failed and in which direction (loose / tight / gap); each maps to one
+profile field: 1 → `stud_d`, 2 → `cavity_gap` (1-wide) or `tube_od` (2-wide) or `socket_d`
+(round), a gap under seated parts → `roof_raise`, 4 → `ext_clearance`, 5 → `xy_scale`.
+
 ## Not calibrated yet
 
 Technic pin holes, axle holes, pins, bars and clips use starting values in the profile
