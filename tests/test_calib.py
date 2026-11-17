@@ -116,8 +116,6 @@ def test_fit_non_monotonic():
     assert (f.lo, f.hi) == (4.85, 4.90)
 
 
-@pytest.mark.xfail(strict=True, reason="calib.fit_ladder: a pooled block that lands exactly on "
-                   "the target score ('4 2' -> '3 3') finds no strict crossing and returns no_data")
 def test_fit_pooled_block_exactly_on_target():
     f = fit_ladder("stud_d", STUD, score("1 1 4 2 5 5 5 5 5"), +1)
     assert f.status in ("ok", "interpolated")

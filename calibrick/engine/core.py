@@ -54,7 +54,7 @@ from . import repair
 from ..ldraw import LDrawLibrary, RawMesh, expand_part
 from ..profile import LDU, Profile
 
-ENGINE_VERSION = 6     # bump whenever generated geometry can change (invalidates the part cache)
+ENGINE_VERSION = 7     # bump whenever generated geometry can change (invalidates the part cache)
 WELD_TOL = 1e-3          # mm
 MIN_ROOF = 0.9           # mm of roof that must remain above a raised cavity ceiling
 MAX_SHIFT = 0.6          # mm; no calibration offset legitimately moves a vertex further
@@ -513,6 +513,17 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
             cap_hi = up_is_hi if kind == "stud" else not up_is_hi
         else:
             continue
+        if kind != "stud":
+            # older part files draw only the last 4 LDU with stud3/stud4 and continue the
+            # tube with plain cylinders: take the attached end from those as well
+            want = outer | inner
+            ext = [c.t for c in circles if c.group == cs[0].group and c.votes != 0
+                   and c.sem_ids <= {-1} and round(c.radius / LDU, 1) in want]
+            if ext:
+                if cap_hi:
+                    t0 = min(t0, min(ext))
+                else:
+                    t1 = max(t1, max(ext))
         foot = cs[0].center - cs[0].t * a
         tip = foot + (t1 if cap_hi else t0) * a
         base = foot + (t0 if cap_hi else t1) * a
@@ -556,7 +567,6 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
             info = prim_info(raw.prim_names[p])
             if info and info[0] and {round(c.radius / LDU, 1) for c in cs} <= radii:
                 removed |= tri_prim == p
-                warns.append("tube/post extension cylinder dropped (legacy part file): check tube length")
 
     # ---- body mesh -----------------------------------------------------------------------------
     vc_all: dict[int, set] = {}                        # welded vertex -> circle ids
@@ -631,6 +641,7 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
         planar = ~f_curved
         pid = np.full(len(f), -1, dtype=np.int64)
         delta = np.zeros(len(f))                      # how far each face moves AGAINST its normal
+        follow: list[tuple] = []                      # raised ceilings: (z, raise, x0, x1, y0, y1)
         if planar.any():
             pf = np.nonzero(planar)[0]
             pkey = np.concatenate([np.round(nrm[pf], 3),
@@ -696,6 +707,10 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
                 room = np.where(np.isinf(up), 0.0, up - MIN_ROOF)
                 raise_by = np.where(boxed, np.clip(np.minimum(want, room), 0.0, None), 0.0)
                 p_delta[ci] = raise_by
+                for k in np.nonzero(raise_by > 0.01)[0]:
+                    pv = verts[f[pf[lab == ci[k]]].reshape(-1)]
+                    follow.append((float(p_zmin[ci[k]]), float(raise_by[k]), pv[:, 0].min(),
+                                   pv[:, 0].max(), pv[:, 1].min(), pv[:, 1].max()))
                 count("raised_ceilings", int((raise_by > 0.01).sum()))
                 if (boxed & (raise_by < want - 0.01)).any():
                     warns.append("cavity roof too thin to deepen fully: genuine studs may not seat completely")
@@ -719,6 +734,15 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
                 cons.setdefault(int(v), []).append((n_, b_))
                 if b_ != 0.0:
                     active.add(int(v))
+        if follow:      # ribs and other shells that END on a raised ceiling have to rise with it
+            body_v = np.unique(f)
+            bz = verts[body_v]
+            for zc, rz, x0, x1, y0, y1 in follow:
+                hit = body_v[(np.abs(bz[:, 2] - zc) < 2e-3) & (bz[:, 0] > x0 - 1e-3)
+                             & (bz[:, 0] < x1 + 1e-3) & (bz[:, 1] > y0 - 1e-3) & (bz[:, 1] < y1 + 1e-3)]
+                for v in hit.tolist():
+                    cons.setdefault(v, []).append((np.array([0.0, 0.0, -1.0]), -rz))
+                    active.add(v)
         vc = {v: vc_all[v] for v in np.unique(f).tolist() if v in vc_all}
         for v, cids in vc.items():
             for cidv in cids:
@@ -816,6 +840,35 @@ def build_mesh(raw: RawMesh, prof: Profile) -> BuildOutput:
                 count("deepened_sockets", len(cuts))
         else:
             warns.append("stud sockets could not be deepened (body is not a closed solid)")
+    if tier == "A" and not solid.is_empty():
+        comps = sorted(solid.decompose(), key=lambda q: -q.volume())
+        if len(comps) > 1:
+            main, loose, n_join, n_drop = comps[0], [], 0, 0
+            for piece in comps[1:]:
+                gap = main.min_gap(piece, 0.5)
+                joined = False
+                if gap < 0.35:                     # a shell that lost contact when faces moved
+                    step = gap + 0.06
+                    for dv in ((0, 0, 1), (0, 0, -1), (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0)):
+                        moved = piece.translate([dv[0] * step, dv[1] * step, dv[2] * step])
+                        if main.min_gap(moved, 0.5) <= 1e-9:
+                            main, joined = main + moved, True
+                            break
+                if joined:
+                    n_join += 1
+                elif piece.volume() < max(1.0, 0.005 * comps[0].volume()):
+                    n_drop += 1
+                else:
+                    loose.append(piece)
+            solid = csg.union([main] + loose)
+            if n_join:
+                warns.append(f"{n_join} small shell(s) were nudged up to 0.4 mm to stay attached to the body")
+            if n_drop:
+                warns.append(f"{n_drop} detached sliver(s) under 1 mm3 were removed")
+            if loose:
+                tier = "B"
+                warns.append(f"{len(loose)} piece(s) are not connected to the main body: this part will not "
+                             "print as one piece, inspect it")
     tris_out = [csg.to_tris(solid)] if not solid.is_empty() else []
     tris_out += soup
     if not tris_out:

@@ -98,6 +98,10 @@ def fit_ladder(key: str, values: list[float], ratings: list[float | None],
     if good:
         # centre of the good band, taken from the raw ratings
         return LadderFit(key, round(sum(good) / len(good), 4), "ok", min(good), max(good), note)
+    pooled = [x for x, y in zip(xs, ys) if abs(y - TARGET) < 1e-9]
+    if pooled:                                   # e.g. a 4 and a 2 next to each other
+        return LadderFit(key, round(sum(pooled) / len(pooled), 4), "interpolated", min(pooled),
+                         max(pooled), note)
     if ys[0] > TARGET:
         return LadderFit(key, xs[0], "all_tight", None, xs[0],
                          "every tested station was tighter than genuine: extend the ladder "

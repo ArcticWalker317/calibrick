@@ -65,15 +65,22 @@ def stud_coupon(p: Profile, values: list[float]) -> Manifold:
 
 
 def underside_coupon(p: Profile, cavity: list[float], tube: list[float],
-                     socket: list[float]) -> Manifold:
+                     socket: list[float], anchors: bool = True) -> Manifold:
+    """Underside ladder. `anchors` adds one-layer tabs that hold the small first-layer
+    islands on the bed. They sit only where nothing mates and nothing has to flex: at cell
+    corners (stiff anyway), as three spokes outside each ring, and as four short spokes on
+    each tube pointing between the stud positions. Fit readings are the same with or without.
+    """
     n = len(cavity)
     depth = 1.6 + p.roof_raise            # cavity depth of a plate after the roof raise
     top = PLATE_H
     length = U_PITCH * (n - 1) + CELL
     ya0, ya1 = 0.0, 7.8                   # lane A: 1x2 cells
-    yb0, yb1 = 9.0, 24.8                  # lane B: 2x2 cells
-    yc = 29.25                            # lane C: ring centres
-    yr0, yr1 = 33.8, 42.3                 # label rail (also supports the roof edge)
+    yb0, yb1 = 10.2, 26.0                 # lane B: 2x2 cells
+    yc = 31.65                           # lane C: ring centres
+    yr0, yr1 = 37.3, 45.8                 # label rail (also supports the roof edge)
+    lh = p.layer_height
+    tabs = []
     solids = [csg.box(0.0, 0.0, depth, length, yr1, top),
               csg.box(0.0, yr0, 0.0, length, yr1, depth + 0.2)]
     cuts, adds, labels = [], [], []
@@ -94,6 +101,16 @@ def underside_coupon(p: Profile, cavity: list[float], tube: list[float],
         adds.append(csg.ring(cx, cyb, 0.0, depth + 0.2, tube[i], 4.95))
         # lane C: 1x1-round-style ring, bore = socket[i]
         adds.append(csg.ring(cx, yc, 0.0, depth + 0.2, 6.5, socket[i]))
+        if anchors:
+            import math
+            for (bx0, by0, bx1, by1) in ((x0, ya0, x0 + CELL, ya1), (x0, yb0, x0 + CELL, yb1)):
+                for tx, ty in ((bx0, by0), (bx1, by0), (bx0, by1), (bx1, by1)):
+                    tabs.append(csg.cyl(tx, ty, 0.0, lh, 4.4, 24))          # corner tab
+            for k in range(3):                                              # ring: 3 outer spokes
+                ang = math.radians(90 + 120 * k)
+                tabs.append(_spoke(cx, yc, ang, 3.0, 4.9, 1.6, lh))
+            for k in range(4):                                              # tube: between the studs
+                tabs.append(_spoke(cx, cyb, math.radians(90 * k), tube[i] / 2.0 - 0.15, 5.5, 1.3, lh))
         # station numbers: on the roof (seen from above) and on the bed side (seen flipped)
         yl = (yr0 + yr1) / 2.0
         labels.append(csg.pixel_text(str(i + 1), cx, yl, top - 0.48, top + 1.0, px=1.0,
@@ -102,7 +119,18 @@ def underside_coupon(p: Profile, cavity: list[float], tube: list[float],
                                      underline=True, mirror_x=True))
     body = csg.union(solids) - csg.union(cuts)
     body = body + csg.union(adds)
+    if tabs:
+        body = body + csg.union(tabs)
     return body - csg.union(labels)
+
+
+def _spoke(cx: float, cy: float, ang: float, r0: float, r1: float, width: float,
+           height: float) -> Manifold:
+    """A flat radial tab from radius r0 to r1 at angle `ang`, lying on the bed."""
+    import math
+
+    b = csg.box(r0, -width / 2.0, 0.0, r1, width / 2.0, height)
+    return b.rotate([0.0, 0.0, math.degrees(ang)]).translate([cx, cy, 0.0])
 
 
 def build_kit(profile: Profile, out_dir: str | Path,
@@ -118,7 +146,7 @@ def build_kit(profile: Profile, out_dir: str | Path,
     for name, m in (("S", s), ("U", u)):
         if m.status().name != "NoError" or m.is_empty():
             raise RuntimeError(f"coupon {name} is not a valid solid: {m.status()}")
-    both = u + s.translate([0.0, 42.3 + 8.0, 0.0])
+    both = u + s.translate([0.0, 45.8 + 8.0, 0.0])
     lo, hi = csg.bbox(both)
     both = both.translate([-(lo[0] + hi[0]) / 2.0, -(lo[1] + hi[1]) / 2.0, 0.0])
     files = {
@@ -139,7 +167,7 @@ def build_kit(profile: Profile, out_dir: str | Path,
         "nominal": {
             "S_length": round(S_PITCH * n - 0.2, 3), "S_width": 23.8, "S_thickness": PLATE_H,
             "S_total_height": round(PLATE_H + profile.stud_h, 3),
-            "U_length": round(U_PITCH * (n - 1) + CELL, 3), "U_width": 42.3,
+            "U_length": round(U_PITCH * (n - 1) + CELL, 3), "U_width": 45.8,
             "U_thickness": PLATE_H, "U_cellA_width": 7.8, "U_cellB_width": 15.8,
         },
         "files": {k: v.name for k, v in files.items()},
